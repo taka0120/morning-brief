@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="朝ブリーフ">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="robots" content="noindex, nofollow">
+<title>朝のニュースブリーフ</title>
+<style>
+  :root {
+    --bg: #f4f3ef; --card: #ffffff; --ink: #1d1d1f; --sub: #6b6b70; --line: #e7e5df;
+    --accent: #2f5bd3; --accent-soft: #e8eefc; --hl: #fff1b8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#121214; --card:#1d1d21; --ink:#f2f2f4; --sub:#a0a0a8; --line:#2c2c33;
+      --accent:#7aa2ff; --accent-soft:#25304d; --hl:#4a3f12; }
+  }
+  .sec-ai     { --c1:#3b6cf6; --c2:#8b5cf6; --tint:#eef2ff; }
+  .sec-golf   { --c1:#15803d; --c2:#65a30d; --tint:#ecfdf3; }
+  .sec-car    { --c1:#ea580c; --c2:#dc2626; --tint:#fff4ed; }
+  .sec-work   { --c1:#7c3aed; --c2:#db2777; --tint:#f6f0ff; }
+  .sec-trivia { --c1:#d97706; --c2:#ca8a04; --tint:#fffaeb; }
+  @media (prefers-color-scheme: dark) {
+    .sec-ai{--tint:#1e2440} .sec-golf{--tint:#16291f} .sec-car{--tint:#2e1f16} .sec-work{--tint:#261d38} .sec-trivia{--tint:#2c2412}
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+    line-height:1.8; font-size:17px;
+    padding: calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 14px) calc(env(safe-area-inset-bottom) + 150px) calc(env(safe-area-inset-left) + 14px); }
+  main { max-width: 680px; margin: 0 auto; }
+
+  /* Cover */
+  .cover { position:relative; overflow:hidden; border-radius: 22px; padding: 22px 20px 20px; color:#fff;
+    background: radial-gradient(120% 120% at 100% 0%, #f59e0b 0%, #ef4444 35%, #6d28d9 75%, #1e3a8a 100%); margin-top: 6px; }
+  .cover svg.sun { position:absolute; right:-20px; top:-20px; width:170px; opacity:.35; }
+  .cover .date { font-size: 14px; opacity:.9; font-weight:600; letter-spacing:.04em; }
+  .cover h1 { font-size: 25px; line-height:1.35; margin: 6px 0 10px; position:relative; }
+  .cover .stats { display:flex; gap:8px; flex-wrap:wrap; position:relative; }
+  .pill { background: rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.3); border-radius:999px; padding:3px 10px; font-size:13px; }
+  .note { font-size: 13px; color: var(--sub); margin: 12px 4px; line-height:1.7; }
+
+  /* TOC */
+  nav.toc { display:grid; grid-template-columns: repeat(5, 1fr); gap:8px; margin: 10px 0 0; }
+  nav.toc a { text-decoration:none; color:var(--ink); background:var(--card); border:1px solid var(--line); border-radius:14px; padding:8px 4px 6px; text-align:center; font-size:11px; line-height:1.3; }
+  nav.toc a .ic { display:block; width:36px; height:36px; margin:0 auto 4px; border-radius:10px; background: linear-gradient(135deg, var(--c1), var(--c2)); padding:6px; }
+  nav.toc a .ic svg { width:100%; height:100%; }
+
+  /* Section hero */
+  section { margin-top: 34px; scroll-margin-top: 10px; }
+  .hero { position:relative; border-radius: 20px; overflow:hidden; color:#fff; padding: 18px 18px; min-height: 104px;
+    background: linear-gradient(135deg, var(--c1), var(--c2)); display:flex; align-items:center; margin-bottom: 14px; }
+  .hero h2 { margin:0; font-size: 23px; line-height:1.3; position:relative; z-index:1; }
+  .hero .count { display:block; font-size: 13px; opacity:.9; font-weight:500; }
+  .hero svg { position:absolute; right: 8px; bottom: 0; height: 100%; width:auto; opacity:.95; }
+  .hero.speaking { outline: 3px solid var(--hl); }
+
+  /* Article */
+  article { background: var(--card); border: 1px solid var(--line); border-radius: 18px; margin-bottom: 16px; overflow:hidden; }
+  .visual { background: var(--tint); padding: 14px; border-bottom: 1px solid var(--line); }
+  .art-body { padding: 14px 16px 12px; }
+  .tag { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color: var(--c1); letter-spacing:.03em; }
+  .tag::before { content:""; width:8px; height:8px; border-radius:50%; background: linear-gradient(135deg, var(--c1), var(--c2)); }
+  @media (prefers-color-scheme: dark) { .tag { color: color-mix(in srgb, var(--c1) 60%, white); } }
+  article h3 { font-size: 19px; line-height:1.45; margin: 4px 0 10px; }
+  .points { list-style:none; padding: 10px 12px; margin: 0 0 12px; background: var(--bg); border-radius: 12px; font-size: 15px; line-height:1.6; }
+  .points li { position:relative; padding-left: 22px; margin: 3px 0; }
+  .points li::before { content:"✓"; position:absolute; left:2px; top:0; color: var(--c1); font-weight:800; }
+  article p { margin: 0 0 10px; }
+  .row { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top: 4px; }
+  .src { font-size: 12.5px; color: var(--sub); line-height:1.5; }
+  .src a { color: var(--accent); }
+  .here { font-size: 13px; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 6px 12px; cursor:pointer; white-space:nowrap; }
+  .speaking { background: var(--hl); border-radius: 6px; transition: background .2s; }
+  h3.speaking { padding: 0 4px; }
+
+  /* Visual types */
+  .stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:10px; }
+  .stat { background: var(--card); border-radius: 14px; padding: 12px; text-align:center; box-shadow: 0 1px 0 var(--line); }
+  .stat .v { font-size: 28px; font-weight: 800; line-height:1.15; letter-spacing:-.01em;
+    background: linear-gradient(135deg, var(--c1), var(--c2)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .stat .u { font-size: 14px; font-weight:700; color: var(--c1); margin-left:2px; }
+  .stat .l { font-size: 12px; color: var(--sub); line-height:1.4; margin-top:4px; }
+  .timeline { position:relative; padding-left: 18px; }
+  .timeline::before { content:""; position:absolute; left:6px; top:6px; bottom:6px; width:3px; border-radius:2px; background: linear-gradient(var(--c1), var(--c2)); }
+  .tl { position:relative; background: var(--card); border-radius: 12px; padding: 8px 12px; margin-bottom: 8px; }
+  .tl:last-child { margin-bottom:0; }
+  .tl::before { content:""; position:absolute; left:-17px; top:14px; width:11px; height:11px; border-radius:50%; background: var(--card); border:3px solid var(--c1); }
+  .tl .w { font-size:12px; font-weight:800; color: var(--c1); }
+  .tl .t { font-weight:700; font-size:15px; line-height:1.4; }
+  .tl .n { font-size:12.5px; color: var(--sub); line-height:1.5; }
+  .cards { display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; }
+  .mini { background: var(--card); border-radius: 14px; padding: 10px 8px; text-align:center; }
+  .mini .e { font-size: 28px; line-height:1.2; }
+  .mini .h { font-size: 12px; font-weight:800; color: var(--c1); margin-top:2px; }
+  .mini .x { font-size: 12px; line-height:1.45; margin-top:2px; }
+  .scale .ttl { font-size: 12.5px; color: var(--sub); margin-bottom:8px; font-weight:600; }
+  .steps { display:grid; grid-template-columns: repeat(6, 1fr); gap:4px; align-items:start; }
+  .step { text-align:center; }
+  .step .bw { height: 74px; display:flex; flex-direction:column; justify-content:flex-end; }
+  .step .b { border-radius: 8px 8px 4px 4px; background: color-mix(in srgb, var(--c1) 22%, var(--card)); color: var(--ink); font-weight:800; font-size:13px; display:flex; align-items:center; justify-content:center; }
+  .step.on .b { background: linear-gradient(135deg, var(--c1), var(--c2)); color:#fff; box-shadow: 0 4px 12px color-mix(in srgb, var(--c1) 40%, transparent); }
+  .step .c { font-size: 10px; color: var(--sub); line-height:1.3; margin-top:4px; }
+  .step.on .c { color: var(--c1); font-weight:700; }
+  .flow { display:flex; align-items:stretch; gap:4px; }
+  .fstep { flex:1; background: var(--card); border-radius: 14px; padding: 10px 6px; text-align:center; font-size:12.5px; line-height:1.4; }
+  .fstep .e { font-size: 26px; display:block; }
+  .arrow { align-self:center; color: var(--c1); font-weight:800; }
+  .ffoot { margin-top:10px; text-align:center; font-weight:800; font-size:15px; color: var(--c1); }
+  .compare { display:flex; align-items:center; gap:10px; }
+  .cbox { flex:1; background: var(--card); border-radius: 14px; padding: 12px; text-align:center; }
+  .cbox .v { font-size: 40px; font-weight: 800; line-height:1.1; }
+  .cbox.after .v { background: linear-gradient(135deg, var(--c1), var(--c2)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .cbox.before .v { color: var(--sub); text-decoration: line-through; text-decoration-thickness: 3px; }
+  .cbox .l { font-size: 12px; color: var(--sub); line-height:1.4; }
+  .compare .arrow { font-size: 26px; }
+
+  /* Player */
+  .player { position: fixed; left: 0; right: 0; bottom: 0; background: color-mix(in srgb, var(--card) 90%, transparent);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--line);
+    padding: 10px calc(env(safe-area-inset-right) + 14px) calc(env(safe-area-inset-bottom) + 10px) calc(env(safe-area-inset-left) + 14px); z-index: 10; }
+  .player-inner { max-width: 680px; margin: 0 auto; }
+  .now { font-size: 13px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 8px; }
+  .controls { display:flex; align-items:center; gap:8px; }
+  .controls button { border:none; border-radius: 12px; height: 46px; min-width: 46px; font-size: 18px; background: var(--accent-soft); color: var(--ink); cursor:pointer; }
+  .controls button.main { flex: 1; background: linear-gradient(135deg, #3b6cf6, #6d28d9); color: #fff; font-size: 16px; font-weight: 700; }
+  .controls select { height: 46px; border-radius: 12px; border:1px solid var(--line); background: var(--card); color: var(--ink); font-size: 15px; padding: 0 8px; }
+  .bar { height: 4px; background: var(--line); border-radius: 2px; margin-top: 8px; overflow:hidden; }
+  .bar > div { height:100%; width:0; background: linear-gradient(90deg, #3b6cf6, #6d28d9); transition: width .3s; }
+  .warn { display:none; font-size: 13px; color: #c2410c; margin-bottom: 6px; }
+  .term { font-weight: 700; background: linear-gradient(transparent 62%, color-mix(in srgb, var(--c1, #3b6cf6) 28%, transparent) 62%); }
+  .gloss { color: var(--sub); font-size: .9em; }
+  .glossary { margin-top: 34px; background: var(--card); border:1px solid var(--line); border-radius: 18px; padding: 16px; }
+  .glossary h2 { font-size: 20px; margin: 0 0 4px; }
+  .glossary .lead { font-size: 13px; color: var(--sub); margin: 0 0 10px; }
+  .glossary dl { margin: 0; }
+  .glossary .g { padding: 9px 0; border-top: 1px solid var(--line); display:flex; gap:10px; align-items:baseline; }
+  .glossary dt { font-weight: 800; min-width: 7.5em; font-size: 15px; line-height:1.5; }
+  .glossary dd { margin: 0; font-size: 14px; line-height: 1.6; color: var(--sub); }
+  .glossary .cat { display:inline-block; font-size: 11px; font-weight:700; color:#fff; border-radius: 999px; padding: 0 7px; margin-right: 6px; background: linear-gradient(135deg, var(--c1), var(--c2)); vertical-align: 1px; }
+  footer { margin-top: 30px; font-size: 13px; color: var(--sub); line-height:1.7; }
+</style>
+</head>
+<body>
+<main>
+  <div class="cover">
+    <svg class="sun" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="22" fill="#fff"/><g stroke="#fff" stroke-width="5" stroke-linecap="round"><line x1="50" y1="6" x2="50" y2="18"/><line x1="50" y1="82" x2="50" y2="94"/><line x1="6" y1="50" x2="18" y2="50"/><line x1="82" y1="50" x2="94" y2="50"/><line x1="19" y1="19" x2="27" y2="27"/><line x1="73" y1="73" x2="81" y2="81"/><line x1="19" y1="81" x2="27" y2="73"/><line x1="73" y1="27" x2="81" y2="19"/></g></svg>
+    <div class="date" id="date"></div>
+    <h1 id="headline"></h1>
+    <div class="stats" id="stats"></div>
+  </div>
+  <nav class="toc" id="toc"></nav>
+  <div class="note" id="note"></div>
+  <div id="content"></div>
+  <footer>「▶ 読み上げ」で最初から再生、各記事の「ここから再生」でその記事から聞けます。画面を消すと止まることがあるので、聞くときは画面をつけたままにしてください。Safariの共有ボタン →「ホーム画面に追加」でアプリのように開けます。</footer>
+</main>
+
+<div class="player">
+  <div class="player-inner">
+    <div class="warn" id="warn">このブラウザでは読み上げ機能が使えません。iPhoneの「画面読み上げ」（設定 › アクセシビリティ › 読み上げコンテンツ）をオンにして、画面の上端から2本指で下にスワイプしてください。</div>
+    <div class="now" id="now">準備OK</div>
+    <div class="controls">
+      <button id="prev" aria-label="前の記事">⏮</button>
+      <button id="play" class="main">▶ 読み上げ</button>
+      <button id="next" aria-label="次の記事">⏭</button>
+      <select id="rate" aria-label="読み上げ速度">
+        <option value="0.9">0.9x</option>
+        <option value="1" selected>1.0x</option>
+        <option value="1.15">1.15x</option>
+        <option value="1.3">1.3x</option>
+        <option value="1.5">1.5x</option>
+      </select>
+    </div>
+    <div class="bar"><div id="progress"></div></div>
+  </div>
+</div>
+
+<script>
+/* ---- Section illustrations (inline SVG, white on gradient) ---- */
+const ART = {
+  ai: `<svg viewBox="0 0 140 100" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+    <g opacity=".55"><line x1="30" y1="25" x2="70" y2="50"/><line x1="30" y1="75" x2="70" y2="50"/><line x1="70" y1="50" x2="110" y2="22"/><line x1="70" y1="50" x2="112" y2="78"/><line x1="30" y1="25" x2="30" y2="75"/><line x1="110" y1="22" x2="112" y2="78"/></g>
+    <circle cx="70" cy="50" r="13" fill="#fff" fill-opacity=".25"/><circle cx="30" cy="25" r="7" fill="#fff"/><circle cx="30" cy="75" r="7" fill="#fff"/><circle cx="110" cy="22" r="7" fill="#fff"/><circle cx="112" cy="78" r="7" fill="#fff"/>
+    <path d="M70 40 l3 7 7 3 -7 3 -3 7 -3 -7 -7 -3 7 -3z" fill="#fff" stroke="none"/></svg>`,
+  golf: `<svg viewBox="0 0 140 100" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+    <path d="M0 92 Q40 66 80 78 T140 70 V100 H0z" fill="#fff" fill-opacity=".22" stroke="none"/>
+    <line x1="86" y1="76" x2="86" y2="14"/><path d="M86 14 L118 24 L86 34z" fill="#fff" stroke="none"/>
+    <ellipse cx="86" cy="78" rx="9" ry="3" fill="#000" fill-opacity=".2" stroke="none"/>
+    <circle cx="40" cy="74" r="8" fill="#fff" stroke="none"/><g fill="#000" fill-opacity=".15"><circle cx="37" cy="72" r="1.3"/><circle cx="42" cy="71" r="1.3"/><circle cx="40" cy="76" r="1.3"/></g>
+    <path d="M14 40 q10 -14 26 -4" opacity=".6" stroke-dasharray="3 5"/></svg>`,
+  car: `<svg viewBox="0 0 140 100" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M14 66 h112" opacity=".5" stroke-dasharray="10 8"/>
+    <path d="M22 58 V48 q0 -6 6 -7 l14 -2 l14 -12 q4 -3 10 -3 h22 q6 0 10 4 l12 12 l10 2 q6 1 6 7 v9 z" fill="#fff" fill-opacity=".25"/>
+    <path d="M48 39 l12 -10 h18 v10 z M84 29 h6 l10 10 h-16 z" fill="#fff" fill-opacity=".55" stroke="none"/>
+    <circle cx="44" cy="60" r="9" fill="#fff"/><circle cx="104" cy="60" r="9" fill="#fff"/>
+    <path d="M60 50 l6 -8 h-5 l4 -8" stroke-width="3"/></svg>`,
+  work: `<svg viewBox="0 0 140 100" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <rect x="22" y="14" width="56" height="74" rx="8" fill="#fff" fill-opacity=".22"/>
+    <path d="M32 34 l5 5 9 -10 M32 54 l5 5 9 -10 M32 74 l5 5 9 -10"/><path d="M52 36 h16 M52 56 h16 M52 76 h12" opacity=".8"/>
+    <g transform="translate(104 58)"><circle r="12" fill="#fff" fill-opacity=".3"/><circle r="5"/>
+    <path d="M0 -20 v6 M0 14 v6 M-20 0 h6 M14 0 h6 M-14 -14 l4 4 M10 10 l4 4 M-14 14 l4 -4 M10 -10 l4 -4"/></g></svg>`,
+  trivia: `<svg viewBox="0 0 140 100" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M70 14 a24 24 0 0 1 14 43 q-4 3 -4 9 v4 h-20 v-4 q0 -6 -4 -9 a24 24 0 0 1 14 -43z" fill="#fff" fill-opacity=".3"/>
+    <path d="M61 78 h18 M63 86 h14"/><path d="M64 46 l6 6 6 -6" opacity=".9"/>
+    <g opacity=".75"><path d="M30 30 l6 4 M110 30 l-6 4 M24 56 h8 M116 56 h-8 M70 2 v5"/></g>
+    <path d="M112 74 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2z" fill="#fff" stroke="none"/></svg>`
+};
+
+function initBrief() {
+  const B = window.BRIEF;
+  const $ = (id) => document.getElementById(id);
+  const h = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+
+  if (!B) { $("headline").textContent = "今日のブリーフを読み込めませんでした"; return; }
+
+  /* ---- 用語マークアップ：{{用語|やさしい説明}} → 用語（やさしい説明） ---- */
+  const TERM_RE = /\{\{([^|{}]+)\|([^{}]+)\}\}/g;
+  const glossary = [], seenTerms = new Set();
+  let curSecKey = "ai";
+  function rich(tag, cls, text) {
+    const el = h(tag, cls);
+    let last = 0, m;
+    TERM_RE.lastIndex = 0;
+    while ((m = TERM_RE.exec(text))) {
+      if (m.index > last) el.appendChild(document.createTextNode(text.slice(last, m.index)));
+      el.appendChild(h("span", "term", m[1]));
+      el.appendChild(h("span", "gloss", `（${m[2]}）`));
+      if (!seenTerms.has(m[1])) { seenTerms.add(m[1]); glossary.push({ term: m[1], gloss: m[2], sec: curSecKey }); }
+      last = TERM_RE.lastIndex;
+    }
+    if (last < text.length) el.appendChild(document.createTextNode(text.slice(last)));
+    return el;
+  }
+  const spoken = (t) => t.replace(TERM_RE, "$1、$2、");
+  const plainLen = (t) => t.replace(TERM_RE, "$1（$2）").length;
+  const d = new Date(B.date + "T08:00:00+09:00");
+  const wd = "日月火水木金土"[d.getDay()];
+  $("date").textContent = `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}（${wd}）MORNING BRIEF`;
+  $("headline").textContent = B.headline || B.title;
+  document.title = B.title || "朝のニュースブリーフ";
+  $("note").textContent = B.note || "";
+
+  /* ---- Visual renderers ---- */
+  function renderVisual(v) {
+    if (!v) return null;
+    const box = h("div", "visual");
+    if (v.type === "stats") {
+      const g = h("div", "stats");
+      v.items.forEach((s) => {
+        const c = h("div", "stat");
+        const val = h("div", "v", s.value);
+        if (s.unit) val.appendChild(h("span", "u", s.unit));
+        c.append(val, h("div", "l", s.label));
+        g.appendChild(c);
+      });
+      box.appendChild(g);
+    } else if (v.type === "timeline") {
+      const t = h("div", "timeline");
+      v.items.forEach((s) => { const c = h("div", "tl"); c.append(h("div", "w", s.when), h("div", "t", s.what)); if (s.note) c.appendChild(h("div", "n", s.note)); t.appendChild(c); });
+      box.appendChild(t);
+    } else if (v.type === "cards") {
+      const g = h("div", "cards");
+      v.items.forEach((s) => { const c = h("div", "mini"); c.append(h("div", "e", s.icon), h("div", "h", s.title), h("div", "x", s.text)); g.appendChild(c); });
+      box.appendChild(g);
+    } else if (v.type === "scale") {
+      const w = h("div", "scale");
+      if (v.title) w.appendChild(h("div", "ttl", v.title));
+      const g = h("div", "steps");
+      v.items.forEach((s, i) => {
+        const c = h("div", "step" + (i === v.highlight ? " on" : ""));
+        const b = h("div", "b", s); b.style.height = (26 + i * 9) + "px";
+        const bw = h("div", "bw"); bw.appendChild(b);
+        c.append(bw, h("div", "c", (v.captions || [])[i] || ""));
+        g.appendChild(c);
+      });
+      w.appendChild(g); box.appendChild(w);
+    } else if (v.type === "flow") {
+      const f = h("div", "flow");
+      v.items.forEach((s, i) => {
+        if (i) f.appendChild(h("div", "arrow", "→"));
+        const c = h("div", "fstep"); c.append(h("span", "e", s.icon), document.createTextNode(s.text)); f.appendChild(c);
+      });
+      box.appendChild(f);
+      if (v.footer) box.appendChild(h("div", "ffoot", v.footer));
+    } else if (v.type === "compare") {
+      const f = h("div", "compare");
+      const mk = (o, cls) => { const c = h("div", "cbox " + cls); c.append(h("div", "v", o.value), h("div", "l", o.label)); return c; };
+      f.append(mk(v.before, "before"), h("div", "arrow", "→"), mk(v.after, "after"));
+      box.appendChild(f);
+    } else return null;
+    return box;
+  }
+
+  /* ---- Render + build speech queue ---- */
+  const queue = [];
+  const content = $("content"), toc = $("toc");
+  let totalChars = 0, itemCount = 0;
+  B.sections.forEach((sec) => {
+    const key = ART[sec.icon] ? sec.icon : "ai";
+    curSecKey = key;
+    const s = h("section", "sec-" + key); s.id = sec.id;
+    const hero = h("div", "hero");
+    const h2 = h("h2", null, sec.label);
+    h2.appendChild(h("span", "count", `${sec.items.length}本の記事`));
+    hero.appendChild(h2);
+    hero.insertAdjacentHTML("beforeend", ART[key]);
+    s.appendChild(hero);
+    queue.push({ el: hero, text: `${sec.label}のニュースです。`, label: sec.label, itemStart: true });
+
+    const a = h("a", "sec-" + key); a.href = "#" + sec.id;
+    const ic = h("span", "ic"); ic.innerHTML = ART[key]; a.append(ic, document.createTextNode(sec.label)); toc.appendChild(a);
+
+    sec.items.forEach((it) => {
+      itemCount++;
+      const art = h("article");
+      const vis = renderVisual(it.visual);
+      if (vis) art.appendChild(vis);
+      const bodyEl = h("div", "art-body");
+      bodyEl.appendChild(h("div", "tag", sec.label));
+      const h3 = rich("h3", null, it.title); bodyEl.appendChild(h3);
+      const label = it.title.replace(TERM_RE, "$1");
+      const startIdx = queue.length;
+      queue.push({ el: h3, text: spoken(it.title) + "。", label, itemStart: true });
+      totalChars += plainLen(it.title);
+      if (it.points && it.points.length) {
+        const ul = h("ul", "points");
+        it.points.forEach((p) => ul.appendChild(rich("li", null, p)));
+        bodyEl.appendChild(ul);
+      }
+      it.body.forEach((p) => {
+        const el = rich("p", null, p); bodyEl.appendChild(el);
+        queue.push({ el, text: spoken(p), label });
+        totalChars += plainLen(p);
+      });
+      const row = h("div", "row");
+      const src = h("div", "src");
+      if (it.source && it.source.url) {
+        src.append("出典：");
+        const link = h("a", null, it.source.name || it.source.url);
+        link.href = it.source.url; link.target = "_blank"; link.rel = "noopener";
+        src.appendChild(link);
+      }
+      const btn = h("button", "here", "▶ ここから再生");
+      btn.addEventListener("click", () => startAt(startIdx));
+      row.append(src, btn);
+      bodyEl.appendChild(row);
+      art.appendChild(bodyEl);
+      s.appendChild(art);
+    });
+    content.appendChild(s);
+  });
+  queue.push({ el: null, text: "以上で今朝のブリーフは終わりです。今日もいい一日を。", label: "おわり" });
+
+  if (glossary.length) {
+    const g = h("section", "glossary"); g.id = "words";
+    g.append(h("h2", null, `今日の用語 ${glossary.length}`), h("p", "lead", "記事に出てきた専門用語のおさらいです。"));
+    const dl = h("dl");
+    glossary.forEach((x) => {
+      const row = h("div", "g sec-" + x.sec);
+      const dt = h("dt"); dt.textContent = x.term;
+      const dd = h("dd"); dd.textContent = x.gloss;
+      row.append(dt, dd); dl.appendChild(row);
+    });
+    g.appendChild(dl); content.appendChild(g);
+  }
+
+  const readMin = Math.round(totalChars / 450), listenMin = Math.round(totalChars / 330);
+  [`${itemCount}本`, `黙読 約${readMin}分`, `読み上げ 約${listenMin}分`].forEach((t) => $("stats").appendChild(h("span", "pill", t)));
+  $("now").textContent = `準備OK：読み上げ 約${listenMin}分`;
+
+  /* ---- Speech ---- */
+  const synth = window.speechSynthesis;
+  if (!synth || typeof SpeechSynthesisUtterance === "undefined") {
+    $("warn").style.display = "block";
+    ["play", "prev", "next", "rate"].forEach((id) => ($(id).disabled = true));
+    document.querySelectorAll(".here").forEach((b) => (b.style.display = "none"));
+    return;
+  }
+  let voice = null;
+  function pickVoice() {
+    const vs = synth.getVoices().filter((v) => /^ja/i.test(v.lang));
+    voice = vs.find((v) => /Kyoko|O-ren|Otoya|Enhanced|Premium|Siri/i.test(v.name)) || vs[0] || null;
+  }
+  pickVoice();
+  if ("onvoiceschanged" in synth) synth.onvoiceschanged = pickVoice;
+
+  const KEY = "brief-pos-" + B.date;
+  let idx = 0, playing = false, token = 0, keepAlive = null;
+  try { const saved = parseInt(localStorage.getItem(KEY), 10); if (saved > 0 && saved < queue.length) idx = saved; } catch (e) {}
+  if (idx > 0) $("now").textContent = `前回の続きから再生できます（${idx + 1}/${queue.length}）`;
+
+  function highlight(i) {
+    document.querySelectorAll(".speaking").forEach((e) => e.classList.remove("speaking"));
+    const q = queue[i];
+    if (q && q.el) {
+      q.el.classList.add("speaking");
+      const r = q.el.getBoundingClientRect();
+      if (r.top < 60 || r.bottom > window.innerHeight - 160) q.el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
+  function updateUI() {
+    $("play").textContent = playing ? "⏸ 一時停止" : (idx > 0 && idx < queue.length ? "▶ 続きから" : "▶ 読み上げ");
+    $("progress").style.width = `${Math.min(100, (idx / (queue.length - 1)) * 100)}%`;
+    const q = queue[idx];
+    if (playing && q) $("now").textContent = `再生中（${idx + 1}/${queue.length}）${q.label}`;
+    try { localStorage.setItem(KEY, String(idx)); } catch (e) {}
+  }
+  function speak(i) {
+    if (i >= queue.length) { stop(true); return; }
+    idx = i;
+    const my = ++token;
+    const u = new SpeechSynthesisUtterance(queue[i].text);
+    u.lang = "ja-JP";
+    if (voice) u.voice = voice;
+    u.rate = parseFloat($("rate").value);
+    u.onend = () => { if (my === token && playing) speak(i + 1); };
+    u.onerror = (e) => { if (my === token && playing && e.error !== "interrupted" && e.error !== "canceled") speak(i + 1); };
+    highlight(i);
+    updateUI();
+    synth.speak(u);
+  }
+  function startAt(i) {
+    token++; synth.cancel();
+    playing = true;
+    clearInterval(keepAlive);
+    keepAlive = setInterval(() => { if (playing && synth.speaking && !/iPhone|iPad|Mac/.test(navigator.userAgent)) { synth.pause(); synth.resume(); } }, 10000);
+    setTimeout(() => speak(i), 60);
+  }
+  function stop(finished) {
+    token++; playing = false; synth.cancel(); clearInterval(keepAlive);
+    if (finished) { idx = 0; highlight(-1); $("now").textContent = "最後まで再生しました"; }
+    else { $("now").textContent = `一時停止中（${idx + 1}/${queue.length}）`; }
+    updateUI();
+  }
+  function jump(dir) {
+    let i;
+    if (dir > 0) { i = idx + 1; while (i < queue.length - 1 && !queue[i].itemStart) i++; }
+    else { i = idx - 1; while (i > 0 && !queue[i].itemStart) i--; if (i < 0) i = 0; }
+    if (playing) startAt(i); else { idx = Math.max(0, i); highlight(idx); updateUI(); }
+  }
+  $("play").addEventListener("click", () => { if (playing) stop(false); else startAt(idx >= queue.length - 1 ? 0 : idx); });
+  $("next").addEventListener("click", () => jump(1));
+  $("prev").addEventListener("click", () => jump(-1));
+  $("rate").addEventListener("change", () => { try { localStorage.setItem("brief-rate", $("rate").value); } catch (e) {} if (playing) startAt(idx); });
+  try { const r = localStorage.getItem("brief-rate"); if (r) $("rate").value = r; } catch (e) {}
+  updateUI();
+}
+</script>
+<script>
+  /* data.js をキャッシュさせずに読み込む（毎朝の更新をすぐ反映） */
+  (function () {
+    var s = document.createElement("script");
+    s.src = "data.js?v=" + Date.now();
+    s.onload = initBrief;
+    s.onerror = initBrief;
+    document.head.appendChild(s);
+  })();
+</script>
+</body>
+</html>
