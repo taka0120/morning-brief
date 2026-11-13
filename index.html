@@ -130,6 +130,12 @@
   .controls select { height: 46px; border-radius: 12px; border:1px solid var(--line); background: var(--card); color: var(--ink); font-size: 15px; padding: 0 8px; }
   .bar { height: 4px; background: var(--line); border-radius: 2px; margin-top: 8px; overflow:hidden; }
   .bar > div { height:100%; width:0; background: linear-gradient(90deg, #3b6cf6, #6d28d9); transition: width .3s; }
+  .vpanel { display:none; margin-bottom: 10px; padding: 10px 12px; border-radius: 12px; background: var(--accent-soft); font-size: 13px; color: var(--sub); line-height: 1.6; }
+  .vpanel.open { display:block; }
+  .vpanel .vrow { display:flex; gap:8px; margin-bottom: 6px; }
+  .vpanel select { flex:1; min-width:0; height: 40px; border-radius: 10px; border:1px solid var(--line); background: var(--card); color: var(--ink); font-size: 15px; padding: 0 8px; }
+  .vpanel button { height: 40px; border:none; border-radius: 10px; padding: 0 12px; background: var(--card); color: var(--ink); font-size: 14px; cursor:pointer; }
+  .vpanel b { color: var(--ink); }
   .warn { display:none; font-size: 13px; color: #c2410c; margin-bottom: 6px; }
   .term { font-weight: 700; background: linear-gradient(transparent 62%, color-mix(in srgb, var(--c1, #3b6cf6) 28%, transparent) 62%); }
   .gloss { color: var(--sub); font-size: .9em; }
@@ -161,14 +167,23 @@
 <div class="player">
   <div class="player-inner">
     <div class="warn" id="warn">このブラウザでは読み上げ機能が使えません。iPhoneの「画面読み上げ」（設定 › アクセシビリティ › 読み上げコンテンツ）をオンにして、画面の上端から2本指で下にスワイプしてください。</div>
+    <div class="vpanel" id="vpanel">
+      <div class="vrow">
+        <select id="voice" aria-label="読み上げの声"></select>
+        <button id="vtest">試しに聞く</button>
+      </div>
+      いちばん自然なのは名前に<b>「拡張」</b>や<b>「Premium」</b>が付いた声です。一覧にないときは、iPhoneの<b>設定 › アクセシビリティ › 読み上げコンテンツ › 声 › 日本語</b>で「O-Ren（拡張）」や「Kyoko（拡張）」をダウンロードしてから、このページを開き直してください。
+    </div>
     <div class="now" id="now">準備OK</div>
     <div class="controls">
       <button id="prev" aria-label="前の記事">⏮</button>
       <button id="play" class="main">▶ 読み上げ</button>
       <button id="next" aria-label="次の記事">⏭</button>
+      <button id="vbtn" aria-label="声の設定">🗣</button>
       <select id="rate" aria-label="読み上げ速度">
         <option value="0.9">0.9x</option>
         <option value="1" selected>1.0x</option>
+        <option value="1.1">1.1x</option>
         <option value="1.15">1.15x</option>
         <option value="1.3">1.3x</option>
         <option value="1.5">1.5x</option>
@@ -234,7 +249,52 @@ function initBrief() {
     if (last < text.length) el.appendChild(document.createTextNode(text.slice(last)));
     return el;
   }
-  const spoken = (t) => t.replace(TERM_RE, "$1、$2、");
+  /* ---- 読み上げ用の文章づくり ----
+     ・1文ずつに分けて読む（長い段落を一息で読むより抑揚が自然になる）
+     ・用語の説明は文の途中に挟まず、その文を読み終えてから「〇〇とは、…のことです。」と足す
+     ・記号は読みやすい言葉に置き換える */
+  function sentences(t) {
+    const out = []; let cur = "", depth = 0;
+    for (let i = 0; i < t.length; i++) {
+      const c = t[i];
+      if (c === "{" && t[i + 1] === "{") { depth++; cur += "{{"; i++; continue; }
+      if (c === "}" && t[i + 1] === "}") { depth = Math.max(0, depth - 1); cur += "}}"; i++; continue; }
+      cur += c;
+      if (!depth && /[。！？!?]/.test(c)) {
+        while (i + 1 < t.length && /[」』）)]/.test(t[i + 1])) cur += t[++i];
+        out.push(cur); cur = "";
+      }
+    }
+    if (cur.trim()) out.push(cur);
+    return out;
+  }
+  function tidy(t) {
+    return t
+      .replace(/(\d)\s*[〜~～]\s*(\d)/g, "$1から$2")
+      .replace(/[〜~～]/g, "から")
+      .replace(/\s*[×✕]\s*/g, "と")
+      .replace(/\s*[→⇒]\s*/g, "、")
+      .replace(/\s+vs\.?\s+/gi, "対")
+      .replace(/[（(]/g, "、").replace(/[）)](?=[がをにはでともへの])/g, "").replace(/[）)]/g, "、")
+      .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "")
+      .replace(/、{2,}/g, "、").replace(/、+([。！？」])/g, "$1").replace(/^、+/, "");
+  }
+  function speechParts(t) {
+    const parts = [];
+    sentences(t).forEach((s) => {
+      const notes = [];
+      const plain = s.replace(TERM_RE, (_, term, gloss) => { notes.push([term, gloss]); return term; });
+      parts.push(tidy(plain));
+      notes.forEach(([term, gloss]) => {
+        // 説明が「A。B」のように2文あるときは「〇〇とは、Aのことです。」「B。」に分ける
+        const [first, ...rest] = gloss.trim().split(/[。．]/).map((x) => x.trim()).filter(Boolean);
+        if (!first) return;
+        parts.push(tidy(`${term}とは、${first}${/(こと|もの)$/.test(first) ? "" : "のこと"}です。`));
+        rest.forEach((x) => parts.push(tidy(x + "。")));
+      });
+    });
+    return parts.filter((p) => p.replace(/[、。！？\s]/g, ""));
+  }
   const plainLen = (t) => t.replace(TERM_RE, "$1（$2）").length;
   const d = new Date(B.date + "T08:00:00+09:00");
   const wd = "日月火水木金土"[d.getDay()];
@@ -308,7 +368,7 @@ function initBrief() {
     hero.appendChild(h2);
     hero.insertAdjacentHTML("beforeend", ART[key]);
     s.appendChild(hero);
-    queue.push({ el: hero, text: `${sec.label}のニュースです。`, label: sec.label, itemStart: true });
+    queue.push({ el: hero, parts: [tidy(`${sec.label}のニュースです。`)], label: sec.label, itemStart: true });
 
     const a = h("a", "sec-" + key); a.href = "#" + sec.id;
     const ic = h("span", "ic"); ic.innerHTML = ART[key]; a.append(ic, document.createTextNode(sec.label)); toc.appendChild(a);
@@ -323,7 +383,7 @@ function initBrief() {
       const h3 = rich("h3", null, it.title); bodyEl.appendChild(h3);
       const label = it.title.replace(TERM_RE, "$1");
       const startIdx = queue.length;
-      queue.push({ el: h3, text: spoken(it.title) + "。", label, itemStart: true });
+      queue.push({ el: h3, parts: speechParts(it.title.replace(/[。！？]?$/, "。")), label, itemStart: true });
       totalChars += plainLen(it.title);
       if (it.points && it.points.length) {
         const ul = h("ul", "points");
@@ -332,7 +392,7 @@ function initBrief() {
       }
       it.body.forEach((p) => {
         const el = rich("p", null, p); bodyEl.appendChild(el);
-        queue.push({ el, text: spoken(p), label });
+        queue.push({ el, parts: speechParts(p), label });
         totalChars += plainLen(p);
       });
       const row = h("div", "row");
@@ -352,7 +412,7 @@ function initBrief() {
     });
     content.appendChild(s);
   });
-  queue.push({ el: null, text: "以上で今朝のブリーフは終わりです。今日もいい一日を。", label: "おわり" });
+  queue.push({ el: null, parts: ["以上で、今朝のブリーフは終わりです。", "今日も、いい一日を。"], label: "おわり", itemStart: true });
 
   if (glossary.length) {
     const g = h("section", "glossary"); g.id = "words";
@@ -375,17 +435,30 @@ function initBrief() {
   const synth = window.speechSynthesis;
   if (!synth || typeof SpeechSynthesisUtterance === "undefined") {
     $("warn").style.display = "block";
-    ["play", "prev", "next", "rate"].forEach((id) => ($(id).disabled = true));
+    ["play", "prev", "next", "rate", "vbtn"].forEach((id) => ($(id).disabled = true));
     document.querySelectorAll(".here").forEach((b) => (b.style.display = "none"));
     return;
   }
-  let voice = null;
-  function pickVoice() {
-    const vs = synth.getVoices().filter((v) => /^ja/i.test(v.lang));
-    voice = vs.find((v) => /Kyoko|O-ren|Otoya|Enhanced|Premium|Siri/i.test(v.name)) || vs[0] || null;
+  /* 声：高品質な声（Premium / 拡張）を優先して自動で選ぶ。選んだ声は覚えておく */
+  let voices = [], voice = null;
+  const score = (v) =>
+    (/premium|プレミアム/i.test(v.name) ? 40 : 0) +
+    (/enhanced|拡張|高品質/i.test(v.name) ? 30 : 0) +
+    (/O-?Ren/i.test(v.name) ? 6 : 0) + (/Kyoko/i.test(v.name) ? 5 : 0) + (/Otoya|Hattori/i.test(v.name) ? 4 : 0) +
+    (/Google/i.test(v.name) ? 3 : 0) + (/Nanami|Keita/i.test(v.name) ? 3 : 0) +
+    (/compact|eloquence|Grandma|Grandpa|Rocko|Shelley|Sandy|Flo|Reed|Eddy/i.test(v.name) ? -30 : 0);
+  function loadVoices() {
+    voices = synth.getVoices().filter((v) => /^ja/i.test(v.lang)).sort((a, b) => score(b) - score(a));
+    const sel = $("voice"); sel.innerHTML = "";
+    if (!voices.length) { sel.appendChild(h("option", null, "日本語の声が見つかりません")); voice = null; return; }
+    voices.forEach((v, i) => { const o = h("option", null, v.name + (i === 0 ? "（おすすめ）" : "")); o.value = v.voiceURI; sel.appendChild(o); });
+    let saved = null; try { saved = localStorage.getItem("brief-voice"); } catch (e) {}
+    voice = voices.find((v) => v.voiceURI === saved) || voices[0];
+    sel.value = voice.voiceURI;
   }
-  pickVoice();
-  if ("onvoiceschanged" in synth) synth.onvoiceschanged = pickVoice;
+  loadVoices();
+  if ("onvoiceschanged" in synth) synth.onvoiceschanged = loadVoices;
+  setTimeout(() => { if (!voices.length) loadVoices(); }, 800);
 
   const KEY = "brief-pos-" + B.date;
   let idx = 0, playing = false, token = 0, keepAlive = null;
@@ -408,18 +481,32 @@ function initBrief() {
     if (playing && q) $("now").textContent = `再生中（${idx + 1}/${queue.length}）${q.label}`;
     try { localStorage.setItem(KEY, String(idx)); } catch (e) {}
   }
-  function speak(i) {
-    if (i >= queue.length) { stop(true); return; }
-    idx = i;
-    const my = ++token;
-    const u = new SpeechSynthesisUtterance(queue[i].text);
+  function utter(text) {
+    const u = new SpeechSynthesisUtterance(text);
     u.lang = "ja-JP";
     if (voice) u.voice = voice;
     u.rate = parseFloat($("rate").value);
-    u.onend = () => { if (my === token && playing) speak(i + 1); };
-    u.onerror = (e) => { if (my === token && playing && e.error !== "interrupted" && e.error !== "canceled") speak(i + 1); };
-    highlight(i);
-    updateUI();
+    u.pitch = 1;
+    return u;
+  }
+  /* 1文ずつ読む。文と文の間・段落の間・記事の間で、少しずつ長めの「間」を空ける */
+  function speak(i, j = 0) {
+    if (i >= queue.length) { stop(true); return; }
+    idx = i;
+    const my = ++token;
+    const parts = queue[i].parts;
+    if (!parts.length) { speak(i + 1); return; }
+    const u = utter(parts[j]);
+    const next = () => {
+      if (my !== token || !playing) return;
+      let fn, ms;
+      if (j + 1 < parts.length) { fn = () => speak(i, j + 1); ms = 80; }
+      else { fn = () => speak(i + 1, 0); ms = queue[i + 1] && queue[i + 1].itemStart ? 900 : 400; }
+      setTimeout(() => { if (my === token && playing) fn(); }, ms);
+    };
+    u.onend = next;
+    u.onerror = (e) => { if (e.error !== "interrupted" && e.error !== "canceled") next(); };
+    if (j === 0) { highlight(i); updateUI(); }
     synth.speak(u);
   }
   function startAt(i) {
@@ -446,6 +533,17 @@ function initBrief() {
   $("prev").addEventListener("click", () => jump(-1));
   $("rate").addEventListener("change", () => { try { localStorage.setItem("brief-rate", $("rate").value); } catch (e) {} if (playing) startAt(idx); });
   try { const r = localStorage.getItem("brief-rate"); if (r) $("rate").value = r; } catch (e) {}
+  $("vbtn").addEventListener("click", () => $("vpanel").classList.toggle("open"));
+  $("voice").addEventListener("change", () => {
+    voice = voices.find((v) => v.voiceURI === $("voice").value) || voice;
+    try { localStorage.setItem("brief-voice", $("voice").value); } catch (e) {}
+    if (playing) startAt(idx);
+  });
+  $("vtest").addEventListener("click", () => {
+    if (playing) stop(false);
+    synth.cancel();
+    setTimeout(() => synth.speak(utter("おはようございます。この声で、今朝のニュースを読み上げます。")), 60);
+  });
   updateUI();
 }
 </script>
